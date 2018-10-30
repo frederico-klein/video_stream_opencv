@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <launch>
+  <arg name="base_path" default="/home/frederico/Documents/videos" />
   <node pkg="video_stream_opencv" type="readpath" name="readpathnode" output="screen">
-      <param name="basepath" type="string" value="/home/frederico/Documents/videos" />
+      <param name="basepath" type="string" value="$(arg base_path)" />
   </node>
 </launch>

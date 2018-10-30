@@ -46,11 +46,12 @@
 #include <boost/thread/thread.hpp>
 #include <queue>
 #include <mutex>
+#include "video_stream_opencv/actvid.h"
 
 std::mutex q_mutex;
 std::queue<cv::Mat> framesQueue;
 cv::VideoCapture cap;
-std::string video_stream_provider_type;
+std::string video_stream_provider_type = "videofile";
 double set_camera_fps;
 int max_queue_size;
 
@@ -85,6 +86,8 @@ sensor_msgs::CameraInfo get_default_camera_info_from_image(sensor_msgs::ImagePtr
 
 
 void do_capture(ros::NodeHandle &nh) {
+
+    ///somewhere around here i need to check if the stream ended and ask for the new one.
     cv::Mat frame;
     ros::Rate camera_fps_rate(set_camera_fps);
 
@@ -119,44 +122,19 @@ int main(int argc, char** argv)
     ros::NodeHandle _nh("~"); // to get the private params
     image_transport::ImageTransport it(nh);
     image_transport::CameraPublisher pub = it.advertiseCamera("camera", 1);
+    ros::ServiceClient client = _nh.serviceClient<video_stream_opencv::actvid>("/videofiles/readpathnode/read_next");
+    video_stream_opencv::actvid srv;
+    if (client.call(srv)){
 
-    // provider can be an url (e.g.: rtsp://10.0.0.1:554) or a number of device, (e.g.: 0 would be /dev/video0)
-    std::string video_stream_provider;
-    if (_nh.getParam("video_stream_provider", video_stream_provider)){
-        ROS_INFO_STREAM("Resource video_stream_provider: " << video_stream_provider);
-        // If we are given a string of 4 chars or less (I don't think we'll have more than 100 video devices connected)
-        // treat is as a number and act accordingly so we open up the videoNUMBER device
-        if (video_stream_provider.size() < 4){
-            ROS_INFO_STREAM("Getting video from provider: /dev/video" << video_stream_provider);
-            video_stream_provider_type = "videodevice";
-            cap.open(atoi(video_stream_provider.c_str()));
-        }
-        else{
-            ROS_INFO_STREAM("Getting video from provider: " << video_stream_provider);
-            if (video_stream_provider.find("http://") != std::string::npos ||
-                    video_stream_provider.find("https://") != std::string::npos){
-                video_stream_provider_type = "http_stream";
-            }
-            else if(video_stream_provider.find("rtsp://") != std::string::npos){
-                video_stream_provider_type = "rtsp_stream";
-            }
-            else {
-                // Check if file exists to know if it's a videofile
-                std::ifstream ifs;
-                ifs.open(video_stream_provider.c_str(), std::ifstream::in);
-                if (ifs.good()){
-                    video_stream_provider_type = "videofile";
-                }
-                else
-                    video_stream_provider_type = "unknown";
-            }
-            cap.open(video_stream_provider);
-        }
+      ROS_INFO("Got service response:\nFile: %s\nAction: %s\nActionDefined: %d  ", srv.response.File.c_str(), srv.response.Action.c_str(), srv.response.ActionDefined);
     }
-    else{
-        ROS_ERROR("Failed to get param 'video_stream_provider'");
-        return -1;
+    else
+    {
+      ROS_ERROR("Failed to call service read_next.");
+      return 1;
     }
+    cap.open(srv.response.File); //so im not checking to see if the file exists. we hope it does.
+
 
     ROS_INFO_STREAM("Video stream provider type detected: " << video_stream_provider_type);
 
@@ -185,11 +163,6 @@ int main(int argc, char** argv)
     double fps;
     _nh.param("fps", fps, 240.0);
     ROS_INFO_STREAM("Throttling to fps: " << fps);
-
-    if (video_stream_provider.size() < 4 && fps > set_camera_fps)
-        ROS_WARN_STREAM("Asked to publish at 'fps' (" << fps
-                        << ") which is higher than the 'set_camera_fps' (" << set_camera_fps <<
-                        "), we can't publish faster than the camera provides images.");
 
     std::string frame_id;
     _nh.param("frame_id", frame_id, std::string("camera"));

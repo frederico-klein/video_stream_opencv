@@ -1,0 +1,4 @@
+---
+string File
+string Action
+bool ActionDefined

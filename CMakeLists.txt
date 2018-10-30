@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   image_transport
   camera_info_manager
   sensor_msgs
+  message_generation
 )
 
 find_package(Boost REQUIRED COMPONENTS
@@ -23,6 +24,18 @@ find_package(Boost REQUIRED COMPONENTS
 )
 
 find_package(OpenCV)
+
+add_service_files(
+  FILES
+  actvid.srv
+
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+
+)
 
 catkin_package()
 
@@ -35,11 +48,17 @@ include_directories(
 add_executable(video_stream src/video_stream.cpp)
 target_link_libraries(video_stream ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
+add_executable(video_stream_multiple_files src/video_stream_multiple_files.cpp)
+target_link_libraries(video_stream_multiple_files ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
 add_executable(readpath src/readpath.cpp)
 target_link_libraries(readpath ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
-install(TARGETS video_stream readpath
+install(TARGETS video_stream video_stream_multiple_files readpath
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+#install(TARGETS video_stream_multiple_files readpath
+#        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 install(PROGRAMS
   scripts/test_video_resource.py

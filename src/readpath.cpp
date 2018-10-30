@@ -6,32 +6,40 @@
 #include <boost/filesystem.hpp>
 #include <ros/ros.h>
 //#include <std_srvs/String.h>
-#include <std_srvs/Empty.h>
+//#include <std_srvs/Empty.h>
+#include "video_stream_opencv/actvid.h"
 
 
 FTS* tree=NULL;
 FTSENT* node=NULL;
 
-bool readnext(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
+//bool readnext(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
+bool readnext(video_stream_opencv::actvid::Request &req, video_stream_opencv::actvid::Response &res) {
+
 //put everything in here, create topics to be published underneath and update them in this callback
   ROS_INFO("readnext service was called. ");
   bool outputtedfile = false;
   while (node = fts_read(tree)) {
       std::string mypath = node->fts_path;
-      std::string extension = boost::filesystem::extension(mypath+ (node->fts_name));
+      boost::filesystem::path currentfile = mypath+ (node->fts_name);
+      std::string extension = boost::filesystem::extension(currentfile);
       //printf("the hell %s\n", extension.c_str());
 
       if (node->fts_level > 0 && node->fts_name[0] == '.' )//(extension.compare(".avi")!= 0)) // || !(extension == ".avi"))
           fts_set(tree, node, FTS_SKIP);
       else if (node->fts_info & FTS_F) {
           if(extension.compare(".avi")==0){
-          printf("%d is the same result\n", extension.compare(".avi"));
-          printf("Got video named %s\n at depth %d,\n "
+            res.Action = currentfile.parent_path().filename().string();
+            printf("%d is the same result\n", extension.compare(".avi"));
+            printf("Got video named %s\n at depth %d,\n "
               "accessible via %s from the current directory \n"
               "or via %s from the original starting directory\n\n",
               node->fts_name, node->fts_level,
               node->fts_accpath, node->fts_path);
-              outputtedfile = true;
+            outputtedfile = true;
+            res.File = node->fts_accpath;
+            res.ActionDefined = true;
+
           /* if fts_open is not given FTS_NOCHDIR,
            * fts may change the program's current working directory */
            }
