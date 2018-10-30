@@ -4,6 +4,10 @@ add_definitions(
     -std=c++11
 )
 
+#add_definitions(-DBOOST_LOG_DYN_LINK=1)
+
+#set(CMAKE_CXX_FLAGS "-lboost_system")
+
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
@@ -13,6 +17,10 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
 )
 
+find_package(Boost REQUIRED COMPONENTS
+  system
+
+)
 
 find_package(OpenCV)
 
@@ -21,12 +29,16 @@ catkin_package()
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
+  $(Boost_INCLUDE_DIRS)
 )
 
 add_executable(video_stream src/video_stream.cpp)
 target_link_libraries(video_stream ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
-install(TARGETS video_stream
+add_executable(readpath src/readpath.cpp)
+target_link_libraries(readpath ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
+install(TARGETS video_stream readpath
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 install(PROGRAMS

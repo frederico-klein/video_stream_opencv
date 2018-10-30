@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<launch>
+  <node pkg="video_stream_opencv" type="readpath" name="readpathnode" output="screen">
+      <param name="basepath" type="string" value="/home/frederico/Documents/videos" />
+  </node>
+</launch>
