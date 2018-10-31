@@ -8,6 +8,7 @@ add_definitions(
 
 #set(CMAKE_CXX_FLAGS "-lboost_system")
 
+
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
@@ -49,6 +50,9 @@ add_executable(video_stream src/video_stream.cpp)
 target_link_libraries(video_stream ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_executable(video_stream_multiple_files src/video_stream_multiple_files.cpp)
+# tells catkin to compile messages before the program that uses them. Thanks to https://answers.ros.org/question/73048/first-compile-with-messages-messages-not-found/
+#add_dependencies(video_stream_multiple_files msg_pkg_generate_messages_cpp)
+add_dependencies(video_stream_multiple_files ${catkin_EXPORTED_TARGETS})
 target_link_libraries(video_stream_multiple_files ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_executable(readpath src/readpath.cpp)

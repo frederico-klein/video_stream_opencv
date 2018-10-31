@@ -21,14 +21,17 @@ bool readnext(video_stream_opencv::actvid::Request &req, video_stream_opencv::ac
   bool outputtedfile = false;
   while (node = fts_read(tree)) {
       std::string mypath = node->fts_path;
+      ROS_INFO("relative path (fts_path): %s",mypath.c_str());
       boost::filesystem::path currentfile = mypath+ (node->fts_name);
+      ROS_INFO("full path of currentfile (boost): %s",currentfile.string().c_str());
       std::string extension = boost::filesystem::extension(currentfile);
+      ROS_INFO("extension of currentfile (boost): %s",extension.c_str());
       //printf("the hell %s\n", extension.c_str());
 
       if (node->fts_level > 0 && node->fts_name[0] == '.' )//(extension.compare(".avi")!= 0)) // || !(extension == ".avi"))
           fts_set(tree, node, FTS_SKIP);
       else if (node->fts_info & FTS_F) {
-          if(extension.compare(".avi")==0){
+          if(extension.compare(".avi")==0 || extension.compare(".mp4")==0){
             res.Action = currentfile.parent_path().filename().string();
             printf("%d is the same result\n", extension.compare(".avi"));
             printf("Got video named %s\n at depth %d,\n "
@@ -48,6 +51,8 @@ bool readnext(video_stream_opencv::actvid::Request &req, video_stream_opencv::ac
         return true; //strange syntax, see if it works
       }
   }
+  ROS_INFO_STREAM("No more files found. I should terminate, don't you think?");
+  return true;
 }
 
 
