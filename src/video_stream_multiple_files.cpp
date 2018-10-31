@@ -52,6 +52,8 @@ std::mutex q_mutex;
 std::queue<cv::Mat> framesQueue;
 cv::VideoCapture cap;
 std::string video_stream_provider_type = "videofile";
+ros::ServiceClient client;
+video_stream_opencv::actvid srv;
 double set_camera_fps;
 int max_queue_size;
 
@@ -93,7 +95,26 @@ void do_capture(ros::NodeHandle &nh) {
 
     // Read frames as fast as possible
     while (nh.ok()) {
-        cap >> frame;
+        //cap >> frame; //i suppose i could have checked for a null frame as well
+        bool haveframe = cap.read(frame);
+        if (!haveframe)
+        {
+          ROS_INFO("Reached the end of the video, didn't I?");
+          //frame = NULL;
+          if (client.call(srv)){
+
+            ROS_INFO("Got service response:\nFile: %s\nAction: %s\nActionDefined: %d  ", srv.response.File.c_str(), srv.response.Action.c_str(), srv.response.ActionDefined);
+            cap.open(srv.response.File); //so im not checking to see if the file exists. we hope it does.
+            haveframe = cap.read(frame);
+          }
+          else
+          {
+            ROS_ERROR("Failed to call service read_next.");
+            frame = NULL;
+          }
+
+        }
+
         if (video_stream_provider_type == "videofile")
         {
             camera_fps_rate.sleep();
@@ -122,8 +143,8 @@ int main(int argc, char** argv)
     ros::NodeHandle _nh("~"); // to get the private params
     image_transport::ImageTransport it(nh);
     image_transport::CameraPublisher pub = it.advertiseCamera("camera", 1);
-    ros::ServiceClient client = _nh.serviceClient<video_stream_opencv::actvid>("/videofiles/readpathnode/read_next");
-    video_stream_opencv::actvid srv;
+    client = _nh.serviceClient<video_stream_opencv::actvid>("/videofiles/readpathnode/read_next");
+
     if (client.call(srv)){
 
       ROS_INFO("Got service response:\nFile: %s\nAction: %s\nActionDefined: %d  ", srv.response.File.c_str(), srv.response.Action.c_str(), srv.response.ActionDefined);
