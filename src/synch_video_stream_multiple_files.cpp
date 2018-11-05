@@ -57,9 +57,8 @@ ros::ServiceClient client;
 video_stream_opencv::actvid srv;
 double set_camera_fps;
 int max_queue_size;
+std::queue<bool> new_fileQueue;
 bool new_file;
-ros::Publisher newfilepub;
-std_msgs::Bool nfmsg;
 // Based on the ros tutorial on transforming opencv images to Image messages
 
 sensor_msgs::CameraInfo get_default_camera_info_from_image(sensor_msgs::ImagePtr img){
@@ -119,8 +118,7 @@ void do_capture(ros::NodeHandle &nh) {
         }else{
           new_file = false;
         }
-        nfmsg.data = new_file;
-        newfilepub.publish(nfmsg);
+
         if (video_stream_provider_type == "videofile")
         {
             camera_fps_rate.sleep();
@@ -131,12 +129,14 @@ void do_capture(ros::NodeHandle &nh) {
             // accumulate only until max_queue_size
             if (framesQueue.size() < max_queue_size) {
                 framesQueue.push(frame.clone());
-
+                new_fileQueue.push(new_file);
             }
             // once reached, drop the oldest frame
             else {
                 framesQueue.pop();
                 framesQueue.push(frame.clone());
+                new_fileQueue.pop();
+                new_fileQueue.push(new_file);
             }
         }
     }
@@ -150,7 +150,7 @@ int main(int argc, char** argv)
     ros::NodeHandle _nh("~"); // to get the private params
     image_transport::ImageTransport it(nh);
     image_transport::CameraPublisher pub = it.advertiseCamera("camera", 1);
-    newfilepub = _nh.advertise<std_msgs::Bool>("new_file",1);
+    ros::Publisher newfilepub = _nh.advertise<std_msgs::Bool>("new_file",1);
     client = _nh.serviceClient<video_stream_opencv::actvid>("/videofiles/readpathnode/read_next");
 
     if (client.call(srv)){
@@ -253,6 +253,7 @@ int main(int argc, char** argv)
     ROS_INFO_STREAM("Opened the stream, starting to publish.");
     boost::thread cap_thread(do_capture, nh);
 
+    std_msgs::Bool nfmsg;
     ros::Rate r(fps);
     while (nh.ok()) {
 
@@ -261,6 +262,8 @@ int main(int argc, char** argv)
             if (!framesQueue.empty()){
                 frame = framesQueue.front();
                 framesQueue.pop();
+                new_file = new_fileQueue.front(); //well, i am not really solving the problem, but at least I am working with the new_fileQueue the same way as the framesQueue, so they should be synchronized...
+                new_fileQueue.pop();
             }
         }
 
@@ -277,9 +280,10 @@ int main(int argc, char** argv)
                     cam_info_msg = get_default_camera_info_from_image(msg);
                     cam_info_manager.setCameraInfo(cam_info_msg);
                 }
+                nfmsg.data = new_file;
                 // The timestamps are in sync thanks to this publisher
                 pub.publish(*msg, cam_info_msg, ros::Time::now());
-
+                newfilepub.publish(nfmsg);
             }
 
             ros::spinOnce();
