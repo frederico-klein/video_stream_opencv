@@ -13,6 +13,8 @@
 FTS* tree=NULL;
 FTSENT* node=NULL;
 
+std::string curract, currfile;
+
 //bool readnext(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
 bool readnext(video_stream_opencv::actvid::Request &req, video_stream_opencv::actvid::Response &res) {
 
@@ -42,7 +44,8 @@ bool readnext(video_stream_opencv::actvid::Request &req, video_stream_opencv::ac
             outputtedfile = true;
             res.File = node->fts_accpath;
             res.ActionDefined = true;
-
+            currfile = res.File;
+            curract = res.Action;
           /* if fts_open is not given FTS_NOCHDIR,
            * fts may change the program's current working directory */
            }
@@ -55,6 +58,12 @@ bool readnext(video_stream_opencv::actvid::Request &req, video_stream_opencv::ac
   return true;
 }
 
+bool curritem(video_stream_opencv::actvid::Request &req, video_stream_opencv::actvid::Response &res) {
+  ROS_INFO("curritem service was called. ");
+  res.File = currfile;
+  res.Action = curract;
+  res.ActionDefined = true;  
+}
 
 int main(int argc, char **argv) {
   //TODO: initialize this as a ros thingy. get parameters from launch file,
