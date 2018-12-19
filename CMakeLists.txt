@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   camera_info_manager
   sensor_msgs
   message_generation
+  std_msgs
 )
 
 find_package(Boost REQUIRED COMPONENTS
@@ -38,7 +39,9 @@ generate_messages(
 
 )
 
-catkin_package()
+catkin_package(
+ CATKIN_DEPENDS std_msgs
+)
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
@@ -57,6 +60,10 @@ target_link_libraries(video_stream_multiple_files ${catkin_LIBRARIES} ${OpenCV_L
 add_executable(readpath src/readpath.cpp)
 add_dependencies(readpath ${catkin_EXPORTED_TARGETS})
 target_link_libraries(readpath ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
+add_executable(readpathp src/readpath_pub.cpp)
+add_dependencies(readpathp ${catkin_EXPORTED_TARGETS})
+target_link_libraries(readpathp ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 install(TARGETS video_stream video_stream_multiple_files readpath
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
