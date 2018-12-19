@@ -103,7 +103,6 @@ void do_capture(ros::NodeHandle &nh) {
         if (!haveframe)
         {
           ROS_INFO("Reached the end of the video, didn't I?");
-          //frame = NULL;
           if (client.call(srv)){
 
             ROS_INFO("Got service response:\nFile: %s\nAction: %s\nActionDefined: %d  ", srv.response.File.c_str(), srv.response.Action.c_str(), srv.response.ActionDefined);
@@ -113,7 +112,6 @@ void do_capture(ros::NodeHandle &nh) {
           else
           {
             ROS_ERROR("Failed to call service read_next.");
-            frame = NULL;
           }
           new_file = true;
         }else{

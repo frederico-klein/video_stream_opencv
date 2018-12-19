@@ -51,11 +51,11 @@ target_link_libraries(video_stream ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_executable(video_stream_multiple_files src/video_stream_multiple_files.cpp)
 # tells catkin to compile messages before the program that uses them. Thanks to https://answers.ros.org/question/73048/first-compile-with-messages-messages-not-found/
-#add_dependencies(video_stream_multiple_files msg_pkg_generate_messages_cpp)
-add_dependencies(video_stream_multiple_files ${catkin_EXPORTED_TARGETS})
+add_dependencies(video_stream_multiple_files video_stream_opencv_generate_messages_cpp)
 target_link_libraries(video_stream_multiple_files ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_executable(readpath src/readpath.cpp)
+add_dependencies(readpath ${catkin_EXPORTED_TARGETS})
 target_link_libraries(readpath ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 install(TARGETS video_stream video_stream_multiple_files readpath
