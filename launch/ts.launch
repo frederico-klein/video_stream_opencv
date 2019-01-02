@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="base_path" default="/media/frederico/167e9587-675e-4fd2-baa0-1400b6594a90/var/datasets/videos/" />
+
+
+   	<!-- images will be published at /camera_name/image with the image transports plugins (e.g.: compressed) installed -->
+
+      <node pkg="video_stream_opencv" type="readpathv" name="readpathnode" output="screen">
+          <param name="basepath" type="string" value="$(arg base_path)" />
+      </node>
+
+
+</launch>

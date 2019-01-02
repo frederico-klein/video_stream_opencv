@@ -65,6 +65,10 @@ add_executable(readpathp src/readpath_pub.cpp)
 add_dependencies(readpathp ${catkin_EXPORTED_TARGETS})
 target_link_libraries(readpathp ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
+add_executable(readpathv src/readpathv.cpp)
+add_dependencies(readpathv ${catkin_EXPORTED_TARGETS})
+target_link_libraries(readpathv ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
 install(TARGETS video_stream video_stream_multiple_files readpath
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
