@@ -7,6 +7,8 @@
 
       <node pkg="video_stream_opencv" type="readpathv" name="readpathnode" output="screen">
           <param name="basepath" type="string" value="$(arg base_path)" />
+          <param name="split" value="1"/>
+          <param name="splitdir" value="/home/frederico/Documents/catkin_backup/src/video_stream_opencv/data/hmdb51_7030splits"/>
       </node>
 
 
