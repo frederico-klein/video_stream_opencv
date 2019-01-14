@@ -1,5 +1,7 @@
 <?xml version="1.0"?>
 <launch>
+    <arg name="rosmastername" default="SATELLITE-S50-B"/>
+    <machine name="tsn_caffe" address="tsn_caffe" user="root" password="ros_ros" env-loader="/temporal-segment-networks/catkin_ws/src/caffe_tsn_ros/env.sh $(arg rosmastername)" ssh-port="22"/>
   	<arg name="camera_name" default="videofiles" />
   	<!-- set camera fps to -->
   	<arg name="set_camera_fps" default="30" />
@@ -51,5 +53,11 @@
           <param name="splitdir" value="/home/frederico/Documents/catkin_backup/src/video_stream_opencv/data/hmdb51_7030splits"/>
       </node>
 	</group>
-
+  <node name="class_tsn_rgb" machine="tsn_caffe" pkg="caffe_tsn_ros" type="class_tsn_rgb2.py" respawn="false" output="screen">
+    <param name="video_topic" value="videofiles/image_raw" />
+    <param name="device_id" value="0" />
+    <param name="dataset" value="hmdb51" />
+    <param name="split" value="1" />
+    <param name="classification_frame_window" value="50" />
+  </node>
 </launch>

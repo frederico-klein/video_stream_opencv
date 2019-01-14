@@ -212,13 +212,14 @@ int main(int argc, char **argv) {
     printf("%lu\n", allMovies.size());
 
 
-    ROS_INFO("readpath service ready to request a path");
-    ros::spin();
     if (errno) {
         perror("fts_read");
                 ROS_ERROR("fts_readfailed ");
         return 1;
     }
+
+    ROS_INFO("readpath service ready to request a path");
+    ros::spin();
 
     if (fts_close(tree)) {
         perror("fts_close");
