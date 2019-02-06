@@ -1,0 +1,6 @@
+<launch>
+  <node pkg="video_stream_opencv" type="readpathsrv" name="readpathnode" output="screen">
+      <param name="basepath" type="string" value="/media/frederico/167e9587-675e-4fd2-baa0-1400b6594a90/var/datasets/videos/" />
+      <param name="splitdir" value="/home/frederico/Documents/catkin_ws/src/video_stream_opencv/data/hmdb51_7030splits"/>
+  </node>
+</launch>

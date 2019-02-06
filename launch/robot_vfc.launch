@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="imagesource" default="/camera/rgb/image_raw" />
+  <arg name="visualize" default="true"/>
+  <arg name="camera_name" default="robotsource" />
+
+    <arg name="rosmastername" default="scitos"/>
+    <machine name="tsn_caffe" address="tsn_caffe" user="root" password="ros_ros" env-loader="/temporal-segment-networks/catkin_ws/src/caffe_tsn_ros/env.sh $(arg rosmastername)" ssh-port="22"/>
+
+	    <node if="$(arg visualize)" name="$(arg camera_name)_image_view" pkg="image_view" type="image_view">
+	    	<remap from="image" to="$(arg imagesource)" />
+	    </node>
+  <node name="class_tsn_rgb" machine="tsn_caffe" pkg="caffe_tsn_ros" type="class_tsn_rgb2.py" respawn="false" output="screen">
+    <param name="video_topic" value="(arg imagesource)" />
+    <param name="device_id" value="0" />
+    <param name="dataset" value="hmdb51" />
+    <param name="split" value="1" />
+    <param name="classification_frame_window" value="50" />
+  </node>
+
+  	    <node if="$(arg visualize)" name="$(arg camera_name)_class_image_view" pkg="image_view" type="image_view">
+  	    	<remap from="image" to="/class_overlay_image_raw" />
+  	    </node>
+</launch>

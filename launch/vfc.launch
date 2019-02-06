@@ -41,6 +41,7 @@
 	        <param name="flip_vertical" type="bool" value="$(arg flip_vertical)" />
 	        <param name="width" type="int" value="$(arg width)" />
 	        <param name="height" type="int" value="$(arg height)" />
+        <param name="autoplay" type="bool" value="false"/>
 	    </node>
 
 	    <node if="$(arg visualize)" name="$(arg camera_name)_image_view" pkg="image_view" type="image_view">
@@ -50,7 +51,7 @@
       <node pkg="video_stream_opencv" type="readpathv" name="readpathnode" output="screen">
           <param name="basepath" type="string" value="$(arg base_path)" />
           <param name="split" value="1"/>
-          <param name="splitdir" value="/home/frederico/Documents/catkin_backup/src/video_stream_opencv/data/hmdb51_7030splits"/>
+          <param name="splitdir" value="/home/frederico/Documents/catkin_ws/src/video_stream_opencv/data/hmdb51_7030splits"/>
       </node>
 	</group>
   <node name="class_tsn_rgb" machine="tsn_caffe" pkg="caffe_tsn_ros" type="class_tsn_rgb2.py" respawn="false" output="screen">

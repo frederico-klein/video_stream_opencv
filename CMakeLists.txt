@@ -30,7 +30,7 @@ find_package(OpenCV)
 add_service_files(
   FILES
   actvid.srv
-
+  split.srv
 )
 
 generate_messages(
@@ -58,16 +58,20 @@ add_dependencies(video_stream_multiple_files video_stream_opencv_generate_messag
 target_link_libraries(video_stream_multiple_files ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_executable(readpath src/readpath.cpp)
-add_dependencies(readpath ${catkin_EXPORTED_TARGETS})
+add_dependencies(readpath ${catkin_EXPORTED_TARGETS} video_stream_opencv_generate_messages_cpp)
 target_link_libraries(readpath ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 add_executable(readpathp src/readpath_pub.cpp)
-add_dependencies(readpathp ${catkin_EXPORTED_TARGETS})
+add_dependencies(readpathp ${catkin_EXPORTED_TARGETS} video_stream_opencv_generate_messages_cpp)
 target_link_libraries(readpathp ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 add_executable(readpathv src/readpathv.cpp)
-add_dependencies(readpathv ${catkin_EXPORTED_TARGETS})
+add_dependencies(readpathv ${catkin_EXPORTED_TARGETS} video_stream_opencv_generate_messages_cpp)
 target_link_libraries(readpathv ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
+add_executable(readpathsrv src/readpathv_service.cpp)
+add_dependencies(readpathsrv ${catkin_EXPORTED_TARGETS} video_stream_opencv_generate_messages_cpp)
+target_link_libraries(readpathsrv ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 install(TARGETS video_stream video_stream_multiple_files readpath
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})

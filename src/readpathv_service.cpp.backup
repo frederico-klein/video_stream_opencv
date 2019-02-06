@@ -9,6 +9,7 @@
 #include <ros/ros.h>
 #include <std_msgs/String.h>
 //#include <std_srvs/Empty.h>
+#include "video_stream_opencv/split.h"
 #include "video_stream_opencv/actvid.h"
 
 
@@ -35,7 +36,7 @@ public:
 
 std::vector<MovieFile> allMovies;
 
-
+    std::string basepath, splitpath;
 //bool readnext(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
 bool readnext(video_stream_opencv::actvid::Request &req, video_stream_opencv::actvid::Response &res) {
 
@@ -79,22 +80,98 @@ bool curritem(video_stream_opencv::actvid::Request &req, video_stream_opencv::ac
   res.ActionDefined = true;
 }
 
+
+bool readsplit(video_stream_opencv::split::Request &req, video_stream_opencv::split::Response &res) {
+
+    //read splits region:
+    boost::filesystem::path splitdir = splitpath;//"/home/frederico/Documents/catkin_backup/src/video_stream_opencv/data/hmdb51_7030splits";
+    //std::string splitdelim = "split";
+    std::string s;
+    //int split = 1;
+    std::ifstream myfile;
+    int splitnum;
+    std::string line;
+    ROS_INFO("Selecting split %d",req.Split);
+    ROS_DEBUG("splitdir: %s",splitdir.c_str());
+    if (boost::filesystem::is_directory(splitdir))
+    {
+      ROS_INFO("Opening directory to verify splits: %s",splitdir.c_str());
+      for (auto& entry: boost::make_iterator_range(boost::filesystem::directory_iterator(splitdir),{}))
+      {
+        s = entry.path().filename().string().c_str();
+        ROS_DEBUG("Verifying split file named: %s",s.c_str());
+        splitnum = std::stoi(s.substr(s.find("split")+5,1).c_str());
+        ROS_DEBUG("Split: %d",splitnum);
+        if (splitnum==req.Split)// && !s.compare("fencing_test_split1.txt"))
+        {
+          ROS_DEBUG("%d is the correct split.",splitnum);
+          myfile.open(entry.path().string());
+
+          while(std::getline(myfile,line))
+          {
+            std::istringstream iss(line);
+            std::string movieline;
+            int test_train_nothing;
+            iss >> movieline >> test_train_nothing;
+            if (test_train_nothing==2)
+            {
+                ROS_DEBUG("%s is included for testing! doing nothing.",movieline.c_str());
+            }
+            else
+            {
+              ROS_DEBUG("%s is member of %d, not used for testing",movieline.c_str(),test_train_nothing);
+              for (int i=0; i<allMovies.size();i++)
+              {
+                ROS_DEBUG("%s %s",allMovies[i].filename.c_str(), movieline.c_str());
+                if (movieline.compare(allMovies[i].filename) == 0)
+                {
+
+                  ROS_DEBUG("movie found, will be removed from allMovies.");
+                  //if it finds the video, since it will only be here once, I can break from the for loop
+                  allMovies.erase(allMovies.begin()+i);
+                  break;
+                } else
+                {
+                  //ROS_DEBUG("%s %s",allMovies[i].filename.c_str(), movieline.c_str());
+                }
+              }
+            }
+
+          }
+          myfile.close();
+        }
+        else
+        {
+          ROS_DEBUG("%d does not match selected split, doing nothing.",splitnum);
+        }
+        //if blablablah...
+      }
+    }
+    printf("%lu\n", allMovies.size());
+
+
+    ROS_INFO("readpath service ready to request a path");
+    return true;
+}
+
 int main(int argc, char **argv) {
   FTS* tree=NULL;
   FTSENT* node=NULL;
 
-  //TODO: initialize this as a ros thingy. get parameters from launch file,
     ros::init(argc, argv, "readpath_service_srv");
     //ros::NodeHandle nh;
     ros::NodeHandle _nh("~"); // to get the private params
-    std::string basepath, splitpath;
+
+
     int split;
     _nh.getParam("basepath", basepath);
     _nh.getParam("split", split);
     _nh.getParam("splitdir", splitpath);
-
-    ros::ServiceServer service = _nh.advertiseService("read_next", readnext);
+    ros::ServiceServer service_rn = _nh.advertiseService("read_next", readnext);
     ROS_DEBUG("instantiated service read_next ");
+    ros::ServiceServer service_rs = _nh.advertiseService("read_split", readsplit);
+    ROS_DEBUG("instantiated service read_split ");
+
     labels = _nh.advertise<std_msgs::String>("y",100);
     done = _nh.advertise<std_msgs::String>("done",100);
 
@@ -144,81 +221,12 @@ int main(int argc, char **argv) {
     }
 
     printf("%lu\n", allMovies.size());
-
-    //read splits region:
-    boost::filesystem::path splitdir = splitpath;//"/home/frederico/Documents/catkin_backup/src/video_stream_opencv/data/hmdb51_7030splits";
-    //std::string splitdelim = "split";
-    std::string s;
-    //int split = 1;
-    std::ifstream myfile;
-    int splitnum;
-    std::string line;
-    ROS_INFO("Selecting split %d",split);
-    ROS_DEBUG("splitdir: %s",splitdir.c_str());
-    if (boost::filesystem::is_directory(splitdir))
-    {
-      ROS_INFO("Opening directory to verify splits: %s",splitdir.c_str());
-      for (auto& entry: boost::make_iterator_range(boost::filesystem::directory_iterator(splitdir),{}))
-      {
-        s = entry.path().filename().string().c_str();
-        ROS_DEBUG("Verifying split file named: %s",s.c_str());
-        splitnum = std::stoi(s.substr(s.find("split")+5,1).c_str());
-        ROS_DEBUG("Split: %d",splitnum);
-        if (splitnum==split)// && !s.compare("fencing_test_split1.txt"))
-        {
-          ROS_DEBUG("%d is the correct split.",splitnum);
-          myfile.open(entry.path().string());
-
-          while(std::getline(myfile,line))
-          {
-            std::istringstream iss(line);
-            std::string movieline;
-            int test_train_nothing;
-            iss >> movieline >> test_train_nothing;
-            if (test_train_nothing==2)
-            {
-                ROS_DEBUG("%s is included for testing! doing nothing.",movieline.c_str());
-            }
-            else
-            {
-              ROS_DEBUG("%s is member of %d, not used for testing",movieline.c_str(),test_train_nothing);
-              for (int i=0; i<allMovies.size();i++)
-              {
-                ROS_DEBUG("%s %s",allMovies[i].filename.c_str(), movieline.c_str());
-                if (movieline.compare(allMovies[i].filename) == 0)
-                {
-
-                  ROS_DEBUG("movie found, will be removed from allMovies.");
-                  //if it finds the video, since it will only be here once, I can break from the for loop
-                  allMovies.erase(allMovies.begin()+i);
-                  break;
-                } else
-                {
-                  //ROS_DEBUG("%s %s",allMovies[i].filename.c_str(), movieline.c_str());
-                }
-              }
-            }
-
-          }
-          myfile.close();
-        }
-        else
-        {
-          ROS_DEBUG("%d does not match selected split, doing nothing.",splitnum);
-        }
-        //if blablablah...
-      }
-    }
-    printf("%lu\n", allMovies.size());
-
-
     if (errno) {
         perror("fts_read");
                 ROS_ERROR("fts_readfailed ");
         return 1;
     }
 
-    ROS_INFO("readpath service ready to request a path");
     ros::spin();
 
     if (fts_close(tree)) {
@@ -227,9 +235,9 @@ int main(int argc, char **argv) {
         return 1;
         }
     return 0;
+}
+
+
+
     //const char *dot[] = {".", 0};
     //char **paths = argc > 1 ? argv + 1 : (char**) dot;
-
-
-
-    }

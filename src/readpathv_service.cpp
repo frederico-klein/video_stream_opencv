@@ -9,6 +9,7 @@
 #include <ros/ros.h>
 #include <std_msgs/String.h>
 //#include <std_srvs/Empty.h>
+#include "video_stream_opencv/split.h"
 #include "video_stream_opencv/actvid.h"
 
 
@@ -35,7 +36,7 @@ public:
 
 std::vector<MovieFile> allMovies;
 
-
+    std::string basepath, splitpath;
 //bool readnext(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
 bool readnext(video_stream_opencv::actvid::Request &req, video_stream_opencv::actvid::Response &res) {
 
@@ -79,71 +80,69 @@ bool curritem(video_stream_opencv::actvid::Request &req, video_stream_opencv::ac
   res.ActionDefined = true;
 }
 
-int main(int argc, char **argv) {
+
+bool readsplit(video_stream_opencv::split::Request &req, video_stream_opencv::split::Response &res) {
   FTS* tree=NULL;
   FTSENT* node=NULL;
+  //need to clear the current allMovies or things look weird
+  allMovies.clear();
+  char const *paths[] = { basepath.c_str(), NULL };
+  tree = fts_open((char**)paths, FTS_NOCHDIR, 0);
+  if (!tree) {
+      perror("fts_open");
+      ROS_ERROR("fts_open failed ");
+      return 1;
 
-  //TODO: initialize this as a ros thingy. get parameters from launch file,
-    ros::init(argc, argv, "readpath_service_srv");
-    //ros::NodeHandle nh;
-    ros::NodeHandle _nh("~"); // to get the private params
-    std::string basepath, splitpath;
-    int split;
-    _nh.getParam("basepath", basepath);
-    _nh.getParam("split", split);
-    _nh.getParam("splitdir", splitpath);
-
-    ros::ServiceServer service = _nh.advertiseService("read_next", readnext);
-    ROS_DEBUG("instantiated service read_next ");
-    labels = _nh.advertise<std_msgs::String>("y",100);
-    done = _nh.advertise<std_msgs::String>("done",100);
-
-    ROS_INFO("defined publisher for y and done.");
-    //char **paths = (char**)(basepath.c_str()); SIGSEVG much!
-    char const *paths[] = { basepath.c_str(), NULL };
-    tree = fts_open((char**)paths, FTS_NOCHDIR, 0);
-    if (!tree) {
-        perror("fts_open");
-        ROS_ERROR("fts_open failed ");
-        return 1;
-
-    }
+  }
 
 
-    while (node = fts_read(tree)) {
-        MovieFile thisMovie;
-        std::string mypath = node->fts_path;
-        ROS_DEBUG("relative path (fts_path): %s",mypath.c_str());
-        boost::filesystem::path currentfile = mypath;//+ (node->fts_name);
-        ROS_DEBUG("full path of currentfile (boost): %s",currentfile.string().c_str());
-        std::string extension = boost::filesystem::extension(currentfile);
-        ROS_DEBUG("extension of currentfile (boost): %s",extension.c_str());
-        //printf("the hell %s\n", extension.c_str());
+  while (node = fts_read(tree)) {
+      MovieFile thisMovie;
+      std::string mypath = node->fts_path;
+      ROS_DEBUG("relative path (fts_path): %s",mypath.c_str());
+      boost::filesystem::path currentfile = mypath;//+ (node->fts_name);
+      ROS_DEBUG("full path of currentfile (boost): %s",currentfile.string().c_str());
+      std::string extension = boost::filesystem::extension(currentfile);
+      ROS_DEBUG("extension of currentfile (boost): %s",extension.c_str());
+      //printf("the hell %s\n", extension.c_str());
 
-        if (node->fts_level > 0 && node->fts_name[0] == '.' )//(extension.compare(".avi")!= 0)) // || !(extension == ".avi"))
-            fts_set(tree, node, FTS_SKIP);
-        else if (node->fts_info & FTS_F) {
-            if(extension.compare(".avi")==0 || extension.compare(".mp4")==0){
-              thisMovie.Action = currentfile.parent_path().filename().string();
-              ROS_DEBUG("%d is the same result\n", extension.compare(".avi"));
-              ROS_DEBUG("Got video named %s\n at depth %d,\n "
-                "accessible via %s from the current directory \n"
-                "or via %s from the original starting directory\n\n",
-                node->fts_name, node->fts_level,
-                node->fts_accpath, node->fts_path);
-              thisMovie.File = node->fts_accpath;
-              thisMovie.filename = currentfile.filename().string();
-              ROS_DEBUG("thisMovie.filename: %s",thisMovie.filename.c_str());
-              thisMovie.ActionDefined = true;
-              /* if fts_open is not given FTS_NOCHDIR,
-             * fts may change the program's current working directory */
-             allMovies.push_back(thisMovie);
-             }
-        }
+      if (node->fts_level > 0 && node->fts_name[0] == '.' )//(extension.compare(".avi")!= 0)) // || !(extension == ".avi"))
+          fts_set(tree, node, FTS_SKIP);
+      else if (node->fts_info & FTS_F) {
+          if(extension.compare(".avi")==0 || extension.compare(".mp4")==0){
+            thisMovie.Action = currentfile.parent_path().filename().string();
+            ROS_DEBUG("%d is the same result\n", extension.compare(".avi"));
+            ROS_DEBUG("Got video named %s\n at depth %d,\n "
+              "accessible via %s from the current directory \n"
+              "or via %s from the original starting directory\n\n",
+              node->fts_name, node->fts_level,
+              node->fts_accpath, node->fts_path);
+            thisMovie.File = node->fts_accpath;
+            thisMovie.filename = currentfile.filename().string();
+            ROS_DEBUG("thisMovie.filename: %s",thisMovie.filename.c_str());
+            thisMovie.ActionDefined = true;
+            /* if fts_open is not given FTS_NOCHDIR,
+           * fts may change the program's current working directory */
+           allMovies.push_back(thisMovie);
+           }
+      }
 
-    }
+  }
 
-    printf("%lu\n", allMovies.size());
+  printf("%lu\n", allMovies.size());
+  if (errno) {
+      perror("fts_read");
+              ROS_ERROR("fts_readfailed ");
+      return 1;
+  }
+
+
+  if (fts_close(tree)) {
+      perror("fts_close");
+              ROS_ERROR("fts_close failed ");
+      return 1;
+      }
+
 
     //read splits region:
     boost::filesystem::path splitdir = splitpath;//"/home/frederico/Documents/catkin_backup/src/video_stream_opencv/data/hmdb51_7030splits";
@@ -153,7 +152,7 @@ int main(int argc, char **argv) {
     std::ifstream myfile;
     int splitnum;
     std::string line;
-    ROS_INFO("Selecting split %d",split);
+    ROS_INFO("Selecting split %d",req.Split);
     ROS_DEBUG("splitdir: %s",splitdir.c_str());
     if (boost::filesystem::is_directory(splitdir))
     {
@@ -164,7 +163,7 @@ int main(int argc, char **argv) {
         ROS_DEBUG("Verifying split file named: %s",s.c_str());
         splitnum = std::stoi(s.substr(s.find("split")+5,1).c_str());
         ROS_DEBUG("Split: %d",splitnum);
-        if (splitnum==split)// && !s.compare("fencing_test_split1.txt"))
+        if (splitnum==req.Split)// && !s.compare("fencing_test_split1.txt"))
         {
           ROS_DEBUG("%d is the correct split.",splitnum);
           myfile.open(entry.path().string());
@@ -212,24 +211,33 @@ int main(int argc, char **argv) {
     printf("%lu\n", allMovies.size());
 
 
-    if (errno) {
-        perror("fts_read");
-                ROS_ERROR("fts_readfailed ");
-        return 1;
-    }
-
     ROS_INFO("readpath service ready to request a path");
+    return true;
+}
+
+int main(int argc, char **argv) {
+
+    ros::init(argc, argv, "readpath_service_srv");
+    //ros::NodeHandle nh;
+    ros::NodeHandle _nh("~"); // to get the private params
+    _nh.getParam("basepath", basepath);
+    _nh.getParam("splitdir", splitpath);
+    ros::ServiceServer service_rn = _nh.advertiseService("read_next", readnext);
+    ROS_DEBUG("instantiated service read_next ");
+    ros::ServiceServer service_rs = _nh.advertiseService("read_split", readsplit);
+    ROS_DEBUG("instantiated service read_split ");
+
+    labels = _nh.advertise<std_msgs::String>("y",100);
+    done = _nh.advertise<std_msgs::String>("done",100);
+
+    ROS_INFO("defined publisher for y and done.");
+    //char **paths = (char**)(basepath.c_str()); SIGSEVG much!
     ros::spin();
 
-    if (fts_close(tree)) {
-        perror("fts_close");
-                ROS_ERROR("fts_close failed ");
-        return 1;
-        }
     return 0;
+}
+
+
+
     //const char *dot[] = {".", 0};
     //char **paths = argc > 1 ? argv + 1 : (char**) dot;
-
-
-
-    }

@@ -48,6 +48,8 @@
 #include <mutex>
 #include "video_stream_opencv/actvid.h"
 #include <std_msgs/Bool.h>
+#include <std_srvs/Empty.h>
+
 
 std::mutex q_mutex;
 std::queue<cv::Mat> framesQueue;
@@ -60,6 +62,10 @@ int max_queue_size;
 bool new_file;
 ros::Publisher newfilepub;
 std_msgs::Bool nfmsg;
+//implements a simple lock to threaded playing instance
+bool playing;
+boost::condition_variable cond;
+boost::mutex mut;
 // Based on the ros tutorial on transforming opencv images to Image messages
 
 sensor_msgs::CameraInfo get_default_camera_info_from_image(sensor_msgs::ImagePtr img){
@@ -91,53 +97,74 @@ sensor_msgs::CameraInfo get_default_camera_info_from_image(sensor_msgs::ImagePtr
 
 
 void do_capture(ros::NodeHandle &nh) {
+  ROS_INFO("calling do_capture");
 
-    ///somewhere around here i need to check if the stream ended and ask for the new one.
-    cv::Mat frame;
-    ros::Rate camera_fps_rate(set_camera_fps);
+      cv::Mat frame;
+      ros::Rate camera_fps_rate(set_camera_fps);
 
-    // Read frames as fast as possible
-    while (nh.ok()) {
-        //cap >> frame; //i suppose i could have checked for a null frame as well
-        bool haveframe = cap.read(frame);
-        if (!haveframe)
-        {
-          ROS_INFO("Reached the end of the video, didn't I?");
-          if (client.call(srv)){
-
-            ROS_INFO("Got service response:\nFile: %s\nAction: %s\nActionDefined: %d  ", srv.response.File.c_str(), srv.response.Action.c_str(), srv.response.ActionDefined);
-            cap.open(srv.response.File); //so im not checking to see if the file exists. we hope it does.
-            haveframe = cap.read(frame);
-          }
-          else
+      // Read frames as fast as possible
+      while (nh.ok()) {
+        boost::unique_lock<boost::mutex> lock(mut);
+        while (!playing){
+          cond.wait(lock);
+        }
+          //cap >> frame; //i suppose i could have checked for a null frame as well
+          bool haveframe = cap.read(frame);
+          if (!haveframe)
           {
-            ROS_ERROR("Failed to call service read_next.");
+            ROS_DEBUG("Reached the end of the video, didn't I?");
+            if (client.call(srv)){
+
+              ROS_INFO("Got service response:\nFile: %s\nAction: %s\nActionDefined: %d  ", srv.response.File.c_str(), srv.response.Action.c_str(), srv.response.ActionDefined);
+              cap.open(srv.response.File); //so im not checking to see if the file exists. we hope it does.
+              haveframe = cap.read(frame);
+            }
+            else
+            {
+              ROS_ERROR("Failed to call service read_next.");
+            }
+            new_file = true;
+          }else{
+            new_file = false;
           }
-          new_file = true;
-        }else{
-          new_file = false;
-        }
-        nfmsg.data = new_file;
-        newfilepub.publish(nfmsg);
-        if (video_stream_provider_type == "videofile")
-        {
-            camera_fps_rate.sleep();
-        }
+          nfmsg.data = new_file;
+          newfilepub.publish(nfmsg);
+          if (video_stream_provider_type == "videofile")
+          {
+              camera_fps_rate.sleep();
+          }
 
-        if(!frame.empty()) {
-            std::lock_guard<std::mutex> g(q_mutex);
-            // accumulate only until max_queue_size
-            if (framesQueue.size() < max_queue_size) {
-                framesQueue.push(frame.clone());
+          if(!frame.empty()) {
+              std::lock_guard<std::mutex> g(q_mutex);
+              // accumulate only until max_queue_size
+              if (framesQueue.size() < max_queue_size) {
+                  framesQueue.push(frame.clone());
 
-            }
-            // once reached, drop the oldest frame
-            else {
-                framesQueue.pop();
-                framesQueue.push(frame.clone());
-            }
-        }
-    }
+              }
+              // once reached, drop the oldest frame
+              else {
+                  framesQueue.pop();
+                  framesQueue.push(frame.clone());
+              }
+          }
+      }
+
+}
+
+bool play(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
+  playing = true;
+  boost::lock_guard<boost::mutex> lock(mut);
+  cond.notify_one();
+  ROS_INFO("Started playing now.");
+  return true;
+}
+
+bool stop(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
+  playing = false;
+  boost::lock_guard<boost::mutex> lock(mut);
+  cond.notify_one();
+  ROS_INFO("Stopped playing.");
+  return true;
 }
 
 
@@ -150,6 +177,17 @@ int main(int argc, char** argv)
     image_transport::CameraPublisher pub = it.advertiseCamera("camera", 1);
     newfilepub = _nh.advertise<std_msgs::Bool>("new_file",1);
     client = _nh.serviceClient<video_stream_opencv::actvid>("/videofiles/readpathnode/read_next");
+
+    ros::ServiceServer service_play = _nh.advertiseService("play", play);
+    ros::ServiceServer service_stop = _nh.advertiseService("stop", stop);
+    bool autoplay;
+    _nh.param("autoplay", autoplay, true);
+    if (autoplay){
+      playing = true;
+      boost::lock_guard<boost::mutex> lock(mut);
+      cond.notify_one();
+      ROS_INFO("Autoplay is defined. Started playing now.");
+    }
 
     if (client.call(srv)){
 
