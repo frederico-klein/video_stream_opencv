@@ -176,17 +176,30 @@ int main(int argc, char** argv)
     image_transport::ImageTransport it(nh);
     image_transport::CameraPublisher pub = it.advertiseCamera("camera", 1);
     newfilepub = _nh.advertise<std_msgs::Bool>("new_file",1);
-    client = _nh.serviceClient<video_stream_opencv::actvid>("/videofiles/readpathnode/read_next");
+    std::string readnextsrvhandle;
+     _nh.param<std::string>("readnext_service_handle",readnextsrvhandle,"/readpathnode/read_next");
+    client = _nh.serviceClient<video_stream_opencv::actvid>(readnextsrvhandle);
 
     ros::ServiceServer service_play = _nh.advertiseService("play", play);
     ros::ServiceServer service_stop = _nh.advertiseService("stop", stop);
     bool autoplay;
-    _nh.param("autoplay", autoplay, true);
+    _nh.param<bool>("autoplay", autoplay, true);
+
+    double fps;
+    _nh.param<double>("fps", fps, 240.0);
+    ros::Rate r(fps);
+
     if (autoplay){
       playing = true;
       boost::lock_guard<boost::mutex> lock(mut);
       cond.notify_one();
       ROS_INFO("Autoplay is defined. Started playing now.");
+    }
+
+    while (!playing){
+        ROS_INFO_ONCE("Thread is locked. Not playing.");
+        ros::spinOnce();
+        r.sleep();
     }
 
     if (client.call(srv)){
@@ -200,6 +213,13 @@ int main(int argc, char** argv)
     }
     cap.open(srv.response.File); //so im not checking to see if the file exists. we hope it does.
 
+    while(!cap.isOpened()){
+      ROS_WARN_THROTTLE(10,"Did not receive a file from service. Is read_next running?");
+      ros::spinOnce();
+      r.sleep();
+      client.call(srv);
+      cap.open(srv.response.File);
+    }
 
     ROS_INFO_STREAM("Video stream provider type detected: " << video_stream_provider_type);
 
@@ -225,8 +245,8 @@ int main(int argc, char** argv)
     ROS_INFO_STREAM("Setting buffer size for capturing frames to: " << buffer_queue_size);
     max_queue_size = buffer_queue_size;
 
-    double fps;
-    _nh.param("fps", fps, 240.0);
+    // double fps;
+    // _nh.param("fps", fps, 240.0);
     ROS_INFO_STREAM("Throttling to fps: " << fps);
 
     std::string frame_id;
@@ -289,7 +309,6 @@ int main(int argc, char** argv)
     ROS_INFO_STREAM("Opened the stream, starting to publish.");
     boost::thread cap_thread(do_capture, nh);
 
-    ros::Rate r(fps);
     while (nh.ok()) {
 
         {

@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- if show a image_view window subscribed to the generated stream -->
+    <arg name="visualize" default="true"/>
+    <arg name="rosmastername" default="SATELLITE-S50-B"/>
+    <machine name="tsn_caffe" address="tsn_caffe" user="root" password="ros_ros" env-loader="/temporal-segment-networks/catkin_ws/src/caffe_tsn_ros/env.sh $(arg rosmastername)" ssh-port="22"/>
+  <node name="class_tsn_rgb" machine="tsn_caffe" pkg="caffe_tsn_ros" type="class_tsn_rgb2.py" respawn="false" output="screen">
+    <param name="video_topic" value="videofiles/image_raw" />
+    <param name="device_id" value="0" />
+    <param name="dataset" value="hmdb51" />
+    <param name="split" value="1" />
+    <param name="action_list" value="['brush_hair','cartwheel','catch','chew','clap','climb','climb_stairs','dive','draw_sword','dribble','drink','eat','fall_floor','fencing','flic_flac','golf','handstand','hit','hug','jump','kick','kick_ball','kiss','laugh','pick','pour','pullup','punch','push','pushup','ride_bike','ride_horse','run','shake_hands','shoot_ball','shoot_bow','shoot_gun','sit','situp','smile','smoke','somersault','stand','swing_baseball','sword','sword_exercise','talk','throw','turn','walk','wave']"/>
+    <param name="classification_frame_window" value="50" />
+  </node>
+  <node if="$(arg visualize)" name="class_image_view" pkg="image_view" type="image_view">
+    <remap from="image" to="/class_overlay_image_raw" />
+  </node>
+</launch>
