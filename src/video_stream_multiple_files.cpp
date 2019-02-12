@@ -121,7 +121,11 @@ void do_capture(ros::NodeHandle &nh) {
             }
             else
             {
-              ROS_ERROR("Failed to call service read_next.");
+              ROS_ERROR("Failed to call service read_next. I'm assuming it isn't running?");
+              ROS_INFO("Stopping play.");
+              playing = false;
+              boost::lock_guard<boost::mutex> lock(mut);
+              cond.notify_one();
             }
             new_file = true;
           }else{

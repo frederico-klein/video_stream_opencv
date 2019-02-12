@@ -24,6 +24,8 @@ ros::Publisher labels;
 
 std_msgs::String done_msg;
 ros::Publisher done;
+bool test = false;
+int test_numvids = 50;
 
 class MovieFile{
 public:
@@ -208,6 +210,12 @@ bool readsplit(video_stream_opencv::split::Request &req, video_stream_opencv::sp
         //if blablablah...
       }
     }
+    if (test)
+    {
+      ROS_WARN("Testing flag set. Choosing only first %d elements of set.", test_numvids);
+       allMovies.resize(test_numvids);
+    }
+
     printf("%lu\n", allMovies.size());
 
 
@@ -222,6 +230,9 @@ int main(int argc, char **argv) {
     ros::NodeHandle _nh("~"); // to get the private params
     _nh.getParam("basepath", basepath);
     _nh.getParam("splitdir", splitpath);
+
+    _nh.getParam("test",test);
+    _nh.getParam("test_numvids",test_numvids);
     ros::ServiceServer service_rn = _nh.advertiseService("read_next", readnext);
     ROS_DEBUG("instantiated service read_next ");
     ros::ServiceServer service_rs = _nh.advertiseService("read_split", readsplit);
