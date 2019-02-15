@@ -200,12 +200,14 @@ int main(int argc, char** argv)
     image_transport::CameraPublisher pub = it.advertiseCamera("camera", 1);
     newfilepub = _nh.advertise<std_msgs::Bool>("new_file",1);
     std::string readnextsrvhandle;
+    std::string classifiernamespace;
      _nh.param<std::string>("readnext_service_handle",readnextsrvhandle,"/readpathnode/read_next");
+     _nh.param<std::string>("classifier_namespace",classifiernamespace,"");
      _nh.param<bool>("publish_nothing_when_stopped",hardstop,true);
 
     client = _nh.serviceClient<video_stream_opencv::actvid>(readnextsrvhandle);
-    startonevid_client = _nh.serviceClient<std_srvs::Empty>("start_vidscores");
-    stoponevid_client = _nh.serviceClient<std_srvs::Empty>("stop_vidscores");
+    startonevid_client = _nh.serviceClient<std_srvs::Empty>(classifiernamespace+"start_vidscores");
+    stoponevid_client = _nh.serviceClient<std_srvs::Empty>(classifiernamespace+"stop_vidscores");
 
     ros::ServiceServer service_play = _nh.advertiseService("play", play);
     ros::ServiceServer service_stop = _nh.advertiseService("stop", stop);
