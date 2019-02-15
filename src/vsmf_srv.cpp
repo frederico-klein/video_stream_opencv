@@ -35,6 +35,7 @@
  */
 
 #include <ros/ros.h>
+#include <ros/console.h>
 #include <image_transport/image_transport.h>
 #include <camera_info_manager/camera_info_manager.h>
 #include <opencv2/highgui/highgui.hpp>
@@ -108,66 +109,101 @@ void do_capture(ros::NodeHandle &nh) {
 
       // Read frames as fast as possible
       while (nh.ok()) {
+        ROS_DEBUG("MARCO : BEGINNING OF do_capture NHOK BIT");
+
         boost::unique_lock<boost::mutex> lock(mut);
         while (!playing){
           if (hardstop)
           {
-            ROS_DEBUG("Clearing frame, since hardstop is on!");
-            frame.release();
+            ROS_DEBUG("NOT Clearing frame, since hardstop is on, BUT CLEARING QUEUE!");
+            //MAYBE I DONT NEED TO DO THIS
+            //frame.release();
             //need to clear the queue too, otherwise it doesn't work!
-            std::lock_guard<std::mutex> g(q_mutex);
+            //no idea what this was doing. maybe a mistake?
+            //std::lock_guard<std::mutex> g(q_mutex);
             framesQueue = emptyFramesQueue;
           }
+          ROS_WARN("WAITING ON LOCK!");
           cond.wait(lock);
+          ROS_DEBUG("CLEARED LOCK");
         }
           //cap >> frame; //i suppose i could have checked for a null frame as well
+          ROS_DEBUG("ABOUT TO FRAMECAP");
           bool haveframe = cap.read(frame);
+          ROS_DEBUG("FRAMECAP OK");
           if (!haveframe)
           {
             ROS_DEBUG("Reached the end of the video, didn't I?");
             // i can tell tsn to calculate the class now, can't i?
             std_srvs::Empty emptycallmessage;
+            ROS_DEBUG("ABOUT TO CALL STOPVID FROM CLASSIFIER");
             stoponevid_client.call(emptycallmessage); //do I need to use an empty std_srvs object here?
+            ROS_DEBUG("DONE CALLING STOPVID FROM CLASSIFIER");
             if (client.call(srv)){
               //I can tell the tsn to start accumulating scores now, can't i?
               //std_srvs::Empty emptycallmessage2;
+              ROS_DEBUG("ABOUT TO STARTVID FROM CLASSIFIER AGAIN");
               startonevid_client.call(emptycallmessage); //same as above...
+              ROS_DEBUG("DONE CALL TO STARTVID FROM CLASSIFIER");
               ROS_INFO("Got service response:\nFile: %s\nAction: %s\nActionDefined: %d  ", srv.response.File.c_str(), srv.response.Action.c_str(), srv.response.ActionDefined);
               cap.open(srv.response.File); //so im not checking to see if the file exists. we hope it does.
+              ROS_DEBUG("OPENED FILE DIDN'T BRAKE");
               haveframe = cap.read(frame);
+              if (!haveframe)
+              {
+                //Im stopping racing conditions. this has happened for too long!
+                ROS_WARN("Could not acquire frame. Maybe my list is empty. Stopping play.");
+                playing = false;
+                frame.release();
+                framesQueue = emptyFramesQueue; ///del del del!
+                // boost::lock_guard<boost::mutex> lock(mut);
+                // cond.notify_all();
+                continue;
+              }
+              else
+              {
+                ROS_DEBUG("HAVEFRAME!");
+              }
             }
             else
             {
               ROS_ERROR("Failed to call service read_next. I'm assuming it isn't running?");
               ROS_INFO("Stopping play.");
               playing = false;
-              boost::lock_guard<boost::mutex> lock(mut);
-              cond.notify_one();
             }
             new_file = true;
           }else{
+            ROS_DEBUG("no newfile. should I just issue a continue here to make it lock?");
             new_file = false;
           }
+          ROS_DEBUG("just before some strange publisher I am not even sure I need anymore");
+
           nfmsg.data = new_file;
           newfilepub.publish(nfmsg);
           if (video_stream_provider_type == "videofile")
           {
               camera_fps_rate.sleep();
           }
+          ROS_DEBUG("just before the frame pusher guy. ");
 
           if(!frame.empty()) {
+              ROS_DEBUG("not my lock... ");
               std::lock_guard<std::mutex> g(q_mutex);
               // accumulate only until max_queue_size
+              ROS_DEBUG("cleared not my LOCK");
               if (framesQueue.size() < max_queue_size) {
                   framesQueue.push(frame.clone());
-
+                  ROS_DEBUG("done pushing fram to queue, but queue was full!");
               }
               // once reached, drop the oldest frame
               else {
                   framesQueue.pop();
                   framesQueue.push(frame.clone());
+                  ROS_DEBUG("done pushing fram to queue. queue was okay");
               }
           }
+          ROS_DEBUG("POLO: END OF do_capture NHOK BIT ");
+
       }
 
 }
@@ -183,9 +219,9 @@ bool play(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
 bool stop(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
   playing = false;
   boost::lock_guard<boost::mutex> lock(mut);
-  // cond.notify_one();
+  cond.notify_one();
 
-  cond.notify_all();
+  //cond.notify_all();
   ROS_INFO("Stopped playing.");
   return true;
 }
@@ -193,6 +229,10 @@ bool stop(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
 
 int main(int argc, char** argv)
 {
+    // set debugging level to DEBUG
+    // if( ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug) ) {
+    //    ros::console::notifyLoggerLevelsChanged();
+    // }
     ros::init(argc, argv, "image_publisher");
     ros::NodeHandle nh;
     ros::NodeHandle _nh("~"); // to get the private params
@@ -339,30 +379,42 @@ int main(int argc, char** argv)
     boost::thread cap_thread(do_capture, nh);
 
     while (nh.ok()) {
+      ROS_DEBUG("MARCO : BEGINNING OF mainloop NHOK BIT");
 
         {
             std::lock_guard<std::mutex> g(q_mutex);
             if(hardstop&&!playing){
-              frame = framesQueue.front();
+              ROS_DEBUG("i'm not playing. i need to clear the current frame, or it will get published. ");
+              frame.release();
+              //frame = framesQueue.front();
               //or i don't need to clear the queue at all since this is an empty frame anyway....
-              assert(frame.empty());
+              //ROS_INFO_STREAM("reached the assertiong bit. ");
+
+              //assert(frame.empty());
             }
             else
             {
               if (!framesQueue.empty()){
+                ROS_DEBUG("quack");
                   frame = framesQueue.front();
+                  ROS_DEBUG("dumbo");
                   framesQueue.pop();
+                  ROS_DEBUG("pop");
               }
             }
         }
 
         if (pub.getNumSubscribers() > 0){
+            ROS_DEBUG("which statement kills me? who is it??? ");
             // Check if grabbed frame is actually filled with some content
             if(!frame.empty()) {
                 // Flip the image if necessary
+                ROS_DEBUG("boobs");
                 if (flip_image)
                     cv::flip(frame, frame, flip_value);
+                ROS_DEBUG("torpedo ");
                 msg = cv_bridge::CvImage(header, "bgr8", frame).toImageMsg();
+                ROS_DEBUG("papaya");
                 // Create a default camera info if we didn't get a stored one on initialization
                 if (cam_info_msg.distortion_model == ""){
                     ROS_WARN_STREAM("No calibration file given, publishing a reasonable default camera info.");
@@ -370,12 +422,18 @@ int main(int argc, char** argv)
                     cam_info_manager.setCameraInfo(cam_info_msg);
                 }
                 // The timestamps are in sync thanks to this publisher
+                  //ROS_INFO_STREAM("do i reach the publisher bit?. ");
+                  ROS_DEBUG("amoeba");
                   pub.publish(*msg, cam_info_msg, ros::Time::now());
+                  ROS_DEBUG("giant boobs ");
+
             }
 
             ros::spinOnce();
         }
         r.sleep();
+        ROS_DEBUG("POLO : END OF mainloop NHOK BIT");
+
     }
     cap_thread.join();
 }

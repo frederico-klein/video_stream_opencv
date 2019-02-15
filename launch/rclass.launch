@@ -4,7 +4,7 @@
     <arg name="visualize" default="true"/>
     <arg name="rosmastername" default="SATELLITE-S50-B"/>
     <machine name="tsn_caffe" address="tsn_caffe" user="root" password="ros_ros" env-loader="/temporal-segment-networks/catkin_ws/src/caffe_tsn_ros/env.sh $(arg rosmastername)" ssh-port="22"/>
-  <node name="class_tsn_rgb" machine="tsn_caffe" pkg="caffe_tsn_ros" type="class_tsn_rgb3.py" respawn="false" output="screen">
+  <node name="class_tsn_rgb" machine="tsn_caffe" pkg="caffe_tsn_ros" type="class_tsn_rgb3.py" respawn="false" output="screen" required="true">
     <param name="video_topic" value="videofiles/image_raw" />
     <param name="device_id" value="0" />
     <param name="dataset" value="hmdb51" />
