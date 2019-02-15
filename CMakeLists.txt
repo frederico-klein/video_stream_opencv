@@ -57,6 +57,10 @@ add_executable(video_stream_multiple_files src/video_stream_multiple_files.cpp)
 add_dependencies(video_stream_multiple_files video_stream_opencv_generate_messages_cpp)
 target_link_libraries(video_stream_multiple_files ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
+add_executable(vss src/vsmf_srv.cpp)
+add_dependencies(vss video_stream_opencv_generate_messages_cpp)
+target_link_libraries(vss ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
 add_executable(readpath src/readpath.cpp)
 add_dependencies(readpath ${catkin_EXPORTED_TARGETS} video_stream_opencv_generate_messages_cpp)
 target_link_libraries(readpath ${catkin_LIBRARIES} ${Boost_LIBRARIES})

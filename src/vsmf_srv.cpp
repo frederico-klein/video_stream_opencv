@@ -49,13 +49,17 @@
 #include "video_stream_opencv/actvid.h"
 #include <std_msgs/Bool.h>
 #include <std_srvs/Empty.h>
+#include <assert.h>
 
 
 std::mutex q_mutex;
 std::queue<cv::Mat> framesQueue;
+std::queue<cv::Mat> emptyFramesQueue;
 cv::VideoCapture cap;
 std::string video_stream_provider_type = "videofile";
 ros::ServiceClient client;
+ros::ServiceClient startonevid_client;
+ros::ServiceClient stoponevid_client;
 video_stream_opencv::actvid srv;
 double set_camera_fps;
 int max_queue_size;
@@ -63,7 +67,7 @@ bool new_file;
 ros::Publisher newfilepub;
 std_msgs::Bool nfmsg;
 //implements a simple lock to threaded playing instance
-bool playing;
+bool playing, hardstop;
 boost::condition_variable cond;
 boost::mutex mut;
 // Based on the ros tutorial on transforming opencv images to Image messages
@@ -106,6 +110,14 @@ void do_capture(ros::NodeHandle &nh) {
       while (nh.ok()) {
         boost::unique_lock<boost::mutex> lock(mut);
         while (!playing){
+          if (hardstop)
+          {
+            ROS_DEBUG("Clearing frame, since hardstop is on!");
+            frame.release();
+            //need to clear the queue too, otherwise it doesn't work!
+            std::lock_guard<std::mutex> g(q_mutex);
+            framesQueue = emptyFramesQueue;
+          }
           cond.wait(lock);
         }
           //cap >> frame; //i suppose i could have checked for a null frame as well
@@ -114,8 +126,12 @@ void do_capture(ros::NodeHandle &nh) {
           {
             ROS_DEBUG("Reached the end of the video, didn't I?");
             // i can tell tsn to calculate the class now, can't i?
+            std_srvs::Empty emptycallmessage;
+            stoponevid_client.call(emptycallmessage); //do I need to use an empty std_srvs object here?
             if (client.call(srv)){
               //I can tell the tsn to start accumulating scores now, can't i?
+              //std_srvs::Empty emptycallmessage2;
+              startonevid_client.call(emptycallmessage); //same as above...
               ROS_INFO("Got service response:\nFile: %s\nAction: %s\nActionDefined: %d  ", srv.response.File.c_str(), srv.response.Action.c_str(), srv.response.ActionDefined);
               cap.open(srv.response.File); //so im not checking to see if the file exists. we hope it does.
               haveframe = cap.read(frame);
@@ -167,7 +183,9 @@ bool play(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
 bool stop(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
   playing = false;
   boost::lock_guard<boost::mutex> lock(mut);
-  cond.notify_one();
+  // cond.notify_one();
+
+  cond.notify_all();
   ROS_INFO("Stopped playing.");
   return true;
 }
@@ -183,7 +201,11 @@ int main(int argc, char** argv)
     newfilepub = _nh.advertise<std_msgs::Bool>("new_file",1);
     std::string readnextsrvhandle;
      _nh.param<std::string>("readnext_service_handle",readnextsrvhandle,"/readpathnode/read_next");
+     _nh.param<bool>("publish_nothing_when_stopped",hardstop,true);
+
     client = _nh.serviceClient<video_stream_opencv::actvid>(readnextsrvhandle);
+    startonevid_client = _nh.serviceClient<std_srvs::Empty>("start_vidscores");
+    stoponevid_client = _nh.serviceClient<std_srvs::Empty>("stop_vidscores");
 
     ros::ServiceServer service_play = _nh.advertiseService("play", play);
     ros::ServiceServer service_stop = _nh.advertiseService("stop", stop);
@@ -318,9 +340,17 @@ int main(int argc, char** argv)
 
         {
             std::lock_guard<std::mutex> g(q_mutex);
-            if (!framesQueue.empty()){
-                frame = framesQueue.front();
-                framesQueue.pop();
+            if(hardstop&&!playing){
+              frame = framesQueue.front();
+              //or i don't need to clear the queue at all since this is an empty frame anyway....
+              assert(frame.empty());
+            }
+            else
+            {
+              if (!framesQueue.empty()){
+                  frame = framesQueue.front();
+                  framesQueue.pop();
+              }
             }
         }
 
@@ -338,8 +368,7 @@ int main(int argc, char** argv)
                     cam_info_manager.setCameraInfo(cam_info_msg);
                 }
                 // The timestamps are in sync thanks to this publisher
-                pub.publish(*msg, cam_info_msg, ros::Time::now());
-
+                  pub.publish(*msg, cam_info_msg, ros::Time::now());
             }
 
             ros::spinOnce();

@@ -3,7 +3,7 @@
       <param name="basepath" type="string" value="/media/frederico/167e9587-675e-4fd2-baa0-1400b6594a90/var/datasets/videos/" />
       <param name="splitdir" value="/home/frederico/Documents/catkin_ws/src/video_stream_opencv/data/hmdb51_7030splits"/>
       <!-- Set test to "true" to get only the first 50 videos and check stuff... -->
-      <param name="test" value="false"/>
+      <param name="test" value="true"/>
       <param name="test_numvids" value="3"/>
   </node>
 </launch>
